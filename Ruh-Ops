@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RUH Station Manager</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0a1628;--navy2:#112240;--navy3:#1a3a5c;
+  --accent:#00b4d8;--accent2:#0077b6;--gold:#f4a261;
+  --success:#2ecc71;--danger:#e74c3c;--warning:#f39c12;--info:#3498db;
+  --bg:#f0f4f8;--card:#ffffff;--border:#dde3eb;
+  --text:#0d1b2a;--muted:#5a6a7a;--light:#f8fafc;
+  --font:'IBM Plex Sans',sans-serif;--mono:'IBM Plex Mono',monospace;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+
+/* ═══ AUTH ═══ */
+#auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;
+  background:var(--navy);position:relative;overflow:hidden}
+#auth-screen::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 30% 50%,rgba(0,180,216,.12) 0%,transparent 60%),
+             radial-gradient(ellipse at 70% 20%,rgba(0,119,182,.1) 0%,transparent 50%);pointer-events:none}
+.auth-grid{position:absolute;inset:0;
+  background-image:linear-gradient(rgba(0,180,216,.04) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(0,180,216,.04) 1px,transparent 1px);
+  background-size:40px 40px;pointer-events:none}
+.auth-box{background:rgba(255,255,255,.04);border:1px solid rgba(0,180,216,.2);
+  border-radius:16px;padding:2.5rem 2rem;width:380px;position:relative;backdrop-filter:blur(20px)}
+.auth-header{text-align:center;margin-bottom:2rem}
+.auth-logo{display:inline-flex;align-items:center;gap:10px;margin-bottom:.75rem}
+.auth-logo-icon{width:42px;height:42px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px}
+.auth-title{font-size:22px;font-weight:700;color:#fff;letter-spacing:-.3px}
+.auth-sub{font-size:12px;color:rgba(255,255,255,.4);margin-top:4px;font-family:var(--mono);letter-spacing:1px}
+.auth-field{margin-bottom:1rem}
+.auth-field label{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.5);
+  text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.auth-field input{width:100%;padding:11px 14px;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#fff;font-size:14px;
+  font-family:var(--font);outline:none;transition:all .2s}
+.auth-field input:focus{border-color:var(--accent);background:rgba(0,180,216,.08);box-shadow:0 0 0 3px rgba(0,180,216,.15)}
+.auth-field input::placeholder{color:rgba(255,255,255,.25)}
+.btn-auth{width:100%;padding:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;
+  font-family:var(--font);letter-spacing:.3px;transition:all .2s;margin-top:.5rem}
+.btn-auth:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,180,216,.4)}
+.btn-auth:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.auth-err{color:#ff6b6b;font-size:12px;text-align:center;margin-top:.75rem;display:none;
+  background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:6px;padding:8px}
+.auth-badge{text-align:center;margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,.08)}
+.auth-badge p{font-size:11px;color:rgba(255,255,255,.25);font-family:var(--mono)}
+
+/* ═══ SETUP SCREEN ═══ */
+#setup-screen{display:none;align-items:center;justify-content:center;min-height:100vh;
+  background:var(--navy);flex-direction:column;gap:1.5rem;padding:2rem}
+.setup-box{background:rgba(255,255,255,.05);border:1px solid rgba(0,180,216,.3);border-radius:16px;
+  padding:2rem;width:100%;max-width:560px;color:#fff}
+.setup-box h2{font-size:18px;margin-bottom:.5rem;color:var(--accent)}
+.setup-box p{font-size:13px;color:rgba(255,255,255,.6);margin-bottom:1.5rem;line-height:1.6}
+.setup-field{margin-bottom:1rem}
+.setup-field label{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.5);
+  text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px}
+.setup-field input{width:100%;padding:10px 14px;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;font-size:13px;
+  font-family:var(--mono);outline:none;transition:border .2s}
+.setup-field input:focus{border-color:var(--accent)}
+.setup-steps{display:flex;flex-direction:column;gap:.5rem;font-size:12px;color:rgba(255,255,255,.5);
+  background:rgba(0,0,0,.2);border-radius:8px;padding:1rem}
+.setup-steps li{padding:3px 0;list-style:none;padding-left:1.2rem;position:relative}
+.setup-steps li::before{content:'→';position:absolute;left:0;color:var(--accent);opacity:.7}
+.setup-note{font-size:11px;color:rgba(255,255,255,.3);text-align:center;font-family:var(--mono)}
+
+/* ═══ APP LAYOUT ═══ */
+#app{display:none;min-height:100vh}
+.sidebar{width:230px;background:var(--navy);min-height:100vh;position:fixed;left:0;top:0;z-index:100;
+  display:flex;flex-direction:column;border-right:1px solid rgba(255,255,255,.06)}
+.sidebar-brand{padding:1.25rem 1.2rem 1rem;border-bottom:1px solid rgba(255,255,255,.07)}
+.brand-row{display:flex;align-items:center;gap:10px}
+.brand-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.brand-text h2{color:#fff;font-size:14px;font-weight:700;letter-spacing:-.2px}
+.brand-text p{color:rgba(255,255,255,.35);font-size:10px;font-family:var(--mono);margin-top:1px}
+.user-pill{margin:10px 1.2rem 0;background:rgba(0,180,216,.1);border:1px solid rgba(0,180,216,.2);
+  border-radius:20px;padding:5px 10px;display:flex;align-items:center;gap:6px}
+.user-pill-dot{width:6px;height:6px;border-radius:50%;background:var(--success);flex-shrink:0;
+  box-shadow:0 0 6px var(--success)}
+.user-pill span{font-size:11px;color:rgba(255,255,255,.7);font-family:var(--mono);font-weight:500}
+.user-pill .role-tag{margin-left:auto;font-size:9px;padding:1px 6px;border-radius:10px;font-weight:600;letter-spacing:.5px}
+.role-admin{background:rgba(244,162,97,.2);color:#f4a261}
+.role-user{background:rgba(0,180,216,.15);color:var(--accent)}
+.nav-group{padding:.5rem .8rem .1rem;font-size:9px;color:rgba(255,255,255,.3);
+  text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:.5rem}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 1.2rem;color:rgba(255,255,255,.55);
+  cursor:pointer;font-size:13px;transition:all .15s;border-left:2px solid transparent;position:relative}
+.nav-item:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.85)}
+.nav-item.active{background:rgba(0,180,216,.1);color:#fff;border-left-color:var(--accent)}
+.nav-icon{font-size:15px;width:18px;text-align:center;opacity:.8}
+.nav-badge{margin-left:auto;background:rgba(231,76,60,.25);color:#ff6b6b;font-size:10px;
+  padding:1px 6px;border-radius:10px;font-weight:700}
+.sidebar-bottom{margin-top:auto;padding:1rem 1.2rem;border-top:1px solid rgba(255,255,255,.07)}
+.sync-status{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.35);
+  margin-bottom:.75rem;font-family:var(--mono)}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--success)}
+.sync-dot.offline{background:#e74c3c}
+.logout-btn{width:100%;padding:8px;background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.2);
+  border-radius:7px;color:rgba(231,76,60,.8);font-size:12px;cursor:pointer;font-family:var(--font);
+  font-weight:600;transition:all .15s}
+.logout-btn:hover{background:rgba(231,76,60,.2);color:#e74c3c}
+
+/* ═══ MAIN ═══ */
+.main{margin-left:230px;padding:1.75rem 2rem;min-height:100vh}
+.page{display:none}
+.page.active{display:block}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.75rem;flex-wrap:wrap;gap:1rem}
+.page-title{font-size:20px;font-weight:700;color:var(--text);letter-spacing:-.4px}
+.page-sub{font-size:12px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
+.header-actions{display:flex;gap:.6rem;flex-wrap:wrap}
+
+/* ═══ CARDS ═══ */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem}
+.card-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.7px;margin-bottom:1rem;display:flex;align-items:center;gap:6px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+
+/* ═══ METRICS ═══ */
+.metric{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.25rem;
+  position:relative;overflow:hidden}
+.metric::after{content:'';position:absolute;right:-10px;top:-10px;width:60px;height:60px;
+  border-radius:50%;opacity:.06}
+.metric.m-blue::after{background:var(--info)}
+.metric.m-green::after{background:var(--success)}
+.metric.m-red::after{background:var(--danger)}
+.metric.m-gold::after{background:var(--gold)}
+.metric-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.7px;margin-bottom:.5rem}
+.metric-val{font-size:24px;font-weight:700;letter-spacing:-.5px;font-family:var(--mono)}
+.metric-val.pos{color:var(--success)}
+.metric-val.neg{color:var(--danger)}
+.metric-val.blue{color:var(--accent2)}
+.metric-val.gold{color:var(--gold)}
+.metric-sub{font-size:11px;color:var(--muted);margin-top:3px}
+
+/* ═══ FORMS ═══ */
+.form-group{margin-bottom:.9rem}
+.form-label{display:block;font-size:11px;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.form-input,.form-select,.form-textarea{width:100%;padding:9px 12px;border:1px solid var(--border);
+  border-radius:8px;font-size:13px;background:#fff;color:var(--text);outline:none;
+  font-family:var(--font);transition:border .15s,box-shadow .15s}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent2);
+  box-shadow:0 0 0 3px rgba(0,119,182,.1)}
+.form-textarea{resize:vertical;min-height:70px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.9rem}
+.sec-head{font-size:12px;font-weight:700;color:var(--navy3);margin:1.25rem 0 .75rem;
+  padding:.4rem .75rem;background:linear-gradient(90deg,rgba(0,119,182,.07),transparent);
+  border-left:3px solid var(--accent2);border-radius:0 6px 6px 0;
+  display:flex;align-items:center;gap:6px}
+
+/* ═══ BUTTONS ═══ */
+.btn{padding:9px 16px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600;
+  border:none;transition:all .15s;font-family:var(--font);display:inline-flex;align-items:center;gap:5px}
+.btn-primary{background:var(--navy2);color:#fff}
+.btn-primary:hover{background:var(--navy3)}
+.btn-accent{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+.btn-accent:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,119,182,.3)}
+.btn-danger{background:rgba(231,76,60,.1);color:var(--danger);border:1px solid rgba(231,76,60,.2)}
+.btn-danger:hover{background:rgba(231,76,60,.2)}
+.btn-success{background:rgba(46,204,113,.1);color:var(--success);border:1px solid rgba(46,204,113,.2)}
+.btn-success:hover{background:rgba(46,204,113,.2)}
+.btn-ghost{background:#f3f4f6;color:#374151;border:1px solid #d1d5db}
+.btn-ghost:hover{background:#e5e7eb}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn-group{display:flex;gap:.6rem;margin-top:1.25rem;flex-wrap:wrap}
+
+/* ═══ TABLES ═══ */
+.tbl-wrap{overflow-x:auto}
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th{background:#f8f9fb;padding:8px 12px;text-align:left;font-size:10px;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;
+  border-bottom:2px solid var(--border);white-space:nowrap}
+.data-table td{padding:9px 12px;border-bottom:1px solid #f0f2f5;vertical-align:middle}
+.data-table tr:hover td{background:#fafbfd}
+.data-table .pos{color:var(--success);font-weight:600;font-family:var(--mono)}
+.data-table .neg{color:var(--danger);font-weight:600;font-family:var(--mono)}
+.data-table .num{font-family:var(--mono)}
+
+/* ═══ BADGES ═══ */
+.badge{padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;letter-spacing:.3px}
+.b-green{background:#dcfce7;color:#166534}
+.b-red{background:#fee2e2;color:#991b1b}
+.b-blue{background:#dbeafe;color:#1e40af}
+.b-gold{background:#fef3c7;color:#92400e}
+.b-gray{background:#f3f4f6;color:#374151}
+.b-purple{background:#f3e8ff;color:#6b21a8}
+.b-teal{background:#ccfbf1;color:#065f46}
+
+/* ═══ TABS ═══ */
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem}
+.tab{padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);
+  border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent2);border-bottom-color:var(--accent2)}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+
+/* ═══ ALERTS ═══ */
+.alert{padding:10px 14px;border-radius:8px;font-size:12px;font-weight:500;margin-bottom:.75rem;
+  display:flex;align-items:flex-start;gap:8px;line-height:1.5}
+.a-warn{background:#fef3c7;color:#92400e;border-left:3px solid #f59e0b}
+.a-danger{background:#fee2e2;color:#991b1b;border-left:3px solid #ef4444}
+.a-info{background:#dbeafe;color:#1e40af;border-left:3px solid #3b82f6}
+.a-success{background:#dcfce7;color:#166534;border-left:3px solid #22c55e}
+
+/* ═══ TASKS ═══ */
+.task-item{background:#fff;border:1px solid var(--border);border-radius:10px;padding:.9rem 1rem;
+  margin-bottom:.6rem;display:flex;gap:10px;align-items:flex-start;transition:box-shadow .15s}
+.task-item:hover{box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.task-cb{margin-top:2px;accent-color:var(--accent2);width:15px;height:15px;cursor:pointer;flex-shrink:0}
+.task-body{flex:1}
+.task-title{font-weight:600;font-size:13px;color:var(--text)}
+.task-title.done{text-decoration:line-through;color:var(--muted)}
+.task-meta{font-size:11px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;margin-top:3px}
+.task-note{font-size:11px;color:var(--muted);margin-top:4px;font-style:italic}
+.p-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle}
+.ph{background:#ef4444}.pm{background:#f59e0b}.pl{background:#22c55e}
+
+/* ═══ USER MGMT ═══ */
+.user-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:1rem;
+  display:flex;align-items:center;gap:12px;margin-bottom:.6rem}
+.user-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;font-family:var(--mono)}
+.ua-admin{background:rgba(244,162,97,.15);color:#c05c00}
+.ua-user{background:rgba(0,119,182,.1);color:var(--accent2)}
+.user-info{flex:1}
+.user-info h4{font-size:13px;font-weight:700;font-family:var(--mono)}
+.user-info p{font-size:11px;color:var(--muted);margin-top:2px}
+.user-access{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+
+/* ═══ TOAST ═══ */
+.toast{position:fixed;bottom:2rem;right:2rem;z-index:9999;padding:10px 18px;border-radius:9px;
+  font-size:13px;font-weight:600;display:none;box-shadow:0 6px 24px rgba(0,0,0,.15);
+  animation:slideUp .3s ease}
+.toast-ok{background:#0a2818;color:#2ecc71;border:1px solid rgba(46,204,113,.3)}
+.toast-err{background:#2a0a0a;color:#e74c3c;border:1px solid rgba(231,76,60,.3)}
+@keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ═══ LOADING ═══ */
+.loading-overlay{position:fixed;inset:0;background:rgba(10,22,40,.95);z-index:9999;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1rem}
+.spinner{width:36px;height:36px;border:3px solid rgba(0,180,216,.2);border-top-color:var(--accent);
+  border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-overlay p{color:rgba(255,255,255,.5);font-size:13px;font-family:var(--mono)}
+
+/* MISC */
+.divider{height:1px;background:var(--border);margin:1.25rem 0}
+.empty-state{text-align:center;padding:2.5rem;color:var(--muted);font-size:13px}
+.empty-state .ei{font-size:32px;margin-bottom:.5rem;opacity:.4}
+.pnl-box{background:#f8f9fb;border-radius:10px;padding:1rem;margin-top:1rem}
+.pnl-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
+.pnl-row.total{border-top:1px solid var(--border);margin-top:6px;padding-top:10px;font-weight:700;font-size:14px}
+.fare-bar{padding:6px 10px;border-radius:6px;font-size:11px;font-weight:700;margin-top:4px;font-family:var(--mono)}
+.fb-below{background:#dcfce7;color:#166534}
+.fb-above{background:#fee2e2;color:#991b1b}
+.fb-equal{background:#dbeafe;color:#1e40af}
+.conn-err{background:rgba(231,76,60,.08);border:1px solid rgba(231,76,60,.25);border-radius:10px;
+  padding:1.5rem;text-align:center;color:var(--danger);font-size:13px}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <p>Connecting to server...</p>
+</div>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="setup-box">
+    <h2>⚙️ First-Time Firebase Setup</h2>
+    <p>This app uses Firebase for real-time sync across all systems. You only need to do this once. Enter your Firebase project credentials below — they will be saved in this HTML file.</p>
+    <ul class="setup-steps">
+      <li>Go to <strong>console.firebase.google.com</strong> and create a free project</li>
+      <li>Go to Project Settings → Add Web App → copy the firebaseConfig values</li>
+      <li>In Realtime Database, create a database and set rules to authenticated-only</li>
+      <li>In Realtime Database → Rules, paste: <code style="background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px">{"rules":{".read":"true",".write":"true"}}</code> (then tighten later)</li>
+      <li>Paste your config values below and click Save</li>
+    </ul>
+    <div style="margin-top:1.5rem">
+      <div class="setup-field"><label>API Key</label><input id="s-apikey" placeholder="AIzaSy..."></div>
+      <div class="setup-field"><label>Auth Domain</label><input id="s-authdomain" placeholder="your-project.firebaseapp.com"></div>
+      <div class="setup-field"><label>Database URL</label><input id="s-dburl" placeholder="https://your-project-default-rtdb.firebaseio.com"></div>
+      <div class="setup-field"><label>Project ID</label><input id="s-projectid" placeholder="your-project-id"></div>
+      <div class="setup-field"><label>App ID</label><input id="s-appid" placeholder="1:123456:web:abc123"></div>
+    </div>
+    <button class="btn-auth" onclick="saveFirebaseConfig()" style="margin-top:1rem">💾 Save Configuration & Connect</button>
+    <p class="setup-note" style="margin-top:1rem">These credentials are stored locally in your browser. Share the configured HTML file with all users.</p>
+  </div>
+</div>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen" style="display:none">
+  <div class="auth-grid"></div>
+  <div class="auth-box">
+    <div class="auth-header">
+      <div class="auth-logo">
+        <div class="auth-logo-icon">✈</div>
+        <span class="auth-title">RUH Station</span>
+      </div>
+      <p class="auth-sub">AUTHORIZED ACCESS ONLY</p>
+    </div>
+    <div class="auth-field"><label>User ID</label><input id="login-user" placeholder="e.g. ruhuupk" autocomplete="username"></div>
+    <div class="auth-field"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <button class="btn-auth" id="login-btn" onclick="doLogin()">Sign In →</button>
+    <p class="auth-err" id="auth-err">Invalid credentials or access denied</p>
+    <div class="auth-badge"><p>PIA · Riyadh Station · Secure Access</p></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-row">
+        <div class="brand-icon">✈</div>
+        <div class="brand-text"><h2>RUH Station</h2><p>PIA · RIYADH</p></div>
+      </div>
+      <div class="user-pill">
+        <div class="user-pill-dot"></div>
+        <span id="pill-user">—</span>
+        <span class="role-tag" id="pill-role">—</span>
+      </div>
+    </div>
+    <div style="flex:1;overflow-y:auto">
+      <div class="nav-group">Main</div>
+      <div class="nav-item" id="nav-dashboard" onclick="showPage('dashboard',this)">
+        <span class="nav-icon">📊</span> Dashboard
+      </div>
+      <div class="nav-group">Data Entry</div>
+      <div class="nav-item" id="nav-finance" onclick="showPage('finance',this)">
+        <span class="nav-icon">💰</span> Finance
+      </div>
+      <div class="nav-item" id="nav-flightecon" onclick="showPage('flightecon',this)">
+        <span class="nav-icon">✈</span> Flight Economics
+      </div>
+      <div class="nav-item" id="nav-competitors" onclick="showPage('competitors',this)">
+        <span class="nav-icon">📋</span> Competitor Fares
+      </div>
+      <div class="nav-item" id="nav-tasks" onclick="showPage('tasks',this)">
+        <span class="nav-icon">✅</span> Tasks
+        <span class="nav-badge" id="task-badge" style="display:none">0</span>
+      </div>
+      <div class="nav-group" id="ng-admin" style="display:none">Admin</div>
+      <div class="nav-item" id="nav-analysis" onclick="showPage('analysis',this)" style="display:none">
+        <span class="nav-icon">🔍</span> Analysis
+      </div>
+      <div class="nav-item" id="nav-users" onclick="showPage('users',this)" style="display:none">
+        <span class="nav-icon">👥</span> User Management
+      </div>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sync-status"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Connected</span></div>
+      <button class="logout-btn" onclick="doLogout()">← Sign Out</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- DASHBOARD (admin only) -->
+    <div class="page" id="page-dashboard">
+      <div class="page-header">
+        <div><div class="page-title">Dashboard</div><div class="page-sub" id="dash-date-sub"></div></div>
+        <div class="header-actions">
+          <button class="btn btn-success btn-sm" onclick="exportAllExcel()">⬇ Export All to Excel</button>
+        </div>
+      </div>
+      <div class="grid-4" style="margin-bottom:1.25rem">
+        <div class="metric m-blue"><div class="metric-label">Total Sales</div><div class="metric-val blue" id="dm-sales">SAR 0</div><div class="metric-sub">All channels</div></div>
+        <div class="metric m-red"><div class="metric-label">Total Expenses</div><div class="metric-val neg" id="dm-exp">SAR 0</div><div class="metric-sub">All types</div></div>
+        <div class="metric m-green"><div class="metric-label">Net P&L</div><div class="metric-val" id="dm-pnl">SAR 0</div><div class="metric-sub">Sales − Expenses</div></div>
+        <div class="metric m-gold"><div class="metric-label">Open Tasks</div><div class="metric-val gold" id="dm-tasks">0</div><div class="metric-sub">Pending / In Progress</div></div>
+      </div>
+      <div class="grid-2" style="margin-bottom:1.25rem">
+        <div class="card"><div class="card-title">📈 Sales Breakdown</div><div style="position:relative;height:210px"><canvas id="chartSales" role="img" aria-label="Sales breakdown">Sales data</canvas></div></div>
+        <div class="card"><div class="card-title">📉 Expense Breakdown</div><div style="position:relative;height:210px"><canvas id="chartExp" role="img" aria-label="Expense breakdown">Expense data</canvas></div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">✈ Recent Flight Economics</div>
+          <div class="tbl-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Sector</th><th>A/C</th><th>VOC</th><th>DOC</th><th>NOC</th></tr></thead><tbody id="dash-fe-body"><tr><td colspan="6" class="empty-state">No data</td></tr></tbody></table></div>
+        </div>
+        <div class="card">
+          <div class="card-title">⚠ Fare Undercut Alerts</div>
+          <div id="dash-alerts">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FINANCE -->
+    <div class="page" id="page-finance">
+      <div class="page-header">
+        <div><div class="page-title">Finance Entry</div><div class="page-sub">BSP · Counter · VA · Cargo · Expenses</div></div>
+        <div class="header-actions" id="fin-export-btn"></div>
+      </div>
+      <div class="tabs">
+        <div class="tab active" onclick="swTab('fin','entry',this)">New Entry</div>
+        <div class="tab" onclick="swTab('fin','records',this)">All Records</div>
+      </div>
+      <div class="tab-pane active" id="fin-entry">
+        <div class="grid-2" style="align-items:start;gap:1.25rem">
+          <div class="card">
+            <div class="sec-head">💰 Sales Figures</div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Month / Period</label><input class="form-input" type="month" id="fin-period"></div>
+              <div class="form-group"><label class="form-label">Remarks</label><input class="form-input" id="fin-remarks" placeholder="Optional"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">BSP Sale (SAR)</label><input class="form-input" type="number" step="any" id="f-bsp" placeholder="0.00" oninput="calcFin()"></div>
+              <div class="form-group"><label class="form-label">PIA Counter Sale</label><input class="form-input" type="number" step="any" id="f-counter" placeholder="0.00" oninput="calcFin()"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">VA Sales</label><input class="form-input" type="number" step="any" id="f-va" placeholder="0.00" oninput="calcFin()"></div>
+              <div class="form-group"><label class="form-label">HR Cargo Sales</label><input class="form-input" type="number" step="any" id="f-cargo" placeholder="0.00" oninput="calcFin()"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">DIP Mail Sale</label><input class="form-input" type="number" step="any" id="f-dip" placeholder="0.00" oninput="calcFin()"></div>
+              <div class="form-group"><label class="form-label">EBT Sale</label><input class="form-input" type="number" step="any" id="f-ebt" placeholder="0.00" oninput="calcFin()"></div>
+            </div>
+            <div class="form-group"><label class="form-label">Misc Sale</label><input class="form-input" type="number" step="any" id="f-misc-sale" placeholder="0.00" oninput="calcFin()"></div>
+          </div>
+          <div class="card">
+            <div class="sec-head">🔴 Expenses</div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">RAC Payments</label><input class="form-input" type="number" step="any" id="f-rac" placeholder="0.00" oninput="calcFin()"></div>
+              <div class="form-group"><label class="form-label">GACA Payments</label><input class="form-input" type="number" step="any" id="f-gaca" placeholder="0.00" oninput="calcFin()"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Swissport Payments</label><input class="form-input" type="number" step="any" id="f-swiss" placeholder="0.00" oninput="calcFin()"></div>
+              <div class="form-group"><label class="form-label">Fuel Payment</label><input class="form-input" type="number" step="any" id="f-fuel" placeholder="0.00" oninput="calcFin()"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Salaries</label><input class="form-input" type="number" step="any" id="f-sal" placeholder="0.00" oninput="calcFin()"></div>
+              <div class="form-group"><label class="form-label">Utilities</label><input class="form-input" type="number" step="any" id="f-util" placeholder="0.00" oninput="calcFin()"></div>
+            </div>
+            <div class="form-group"><label class="form-label">Misc Expenses</label><input class="form-input" type="number" step="any" id="f-misc-exp" placeholder="0.00" oninput="calcFin()"></div>
+            <div class="pnl-box">
+              <div class="pnl-row"><span>Total Sales</span><span style="color:var(--success);font-family:var(--mono);font-weight:600" id="f-ts">SAR 0.00</span></div>
+              <div class="pnl-row"><span>Total Expenses</span><span style="color:var(--danger);font-family:var(--mono);font-weight:600" id="f-te">SAR 0.00</span></div>
+              <div class="pnl-row total"><span>Net P&L</span><span id="f-pnl" style="font-family:var(--mono)">SAR 0.00</span></div>
+            </div>
+            <div class="btn-group">
+              <button class="btn btn-accent" onclick="saveFin()">💾 Save Record</button>
+              <button class="btn btn-ghost" onclick="clrFin()">↺ Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-pane" id="fin-records">
+        <div class="card">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:.75rem">
+            <button class="btn btn-success btn-sm" onclick="exportExcel('finance')">⬇ Export Excel</button>
+          </div>
+          <div class="tbl-wrap">
+            <table class="data-table" id="fin-table">
+              <thead><tr><th>Period</th><th>By</th><th>BSP</th><th>Counter</th><th>VA</th><th>Cargo</th><th>DIP</th><th>EBT</th><th>Misc Sale</th><th>Total Sales</th><th>RAC</th><th>GACA</th><th>Swissport</th><th>Fuel</th><th>Salaries</th><th>Utilities</th><th>Misc Exp</th><th>Total Exp</th><th>P&L</th><th>Remarks</th><th></th></tr></thead>
+              <tbody id="fin-tbody"><tr><td colspan="21" class="empty-state"><div class="ei">📄</div>No records yet</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FLIGHT ECONOMICS (admin only) -->
+    <div class="page" id="page-flightecon">
+      <div class="page-header">
+        <div><div class="page-title">Flight Economics (PIA)</div><div class="page-sub">VOC · DOC · NOC · Sector Performance</div></div>
+        <div class="header-actions"><button class="btn btn-success btn-sm" onclick="exportExcel('flightecon')">⬇ Export Excel</button></div>
+      </div>
+      <div class="tabs">
+        <div class="tab active" onclick="swTab('fe','entry',this)">New Entry</div>
+        <div class="tab" onclick="swTab('fe','records',this)">All Records</div>
+      </div>
+      <div class="tab-pane active" id="fe-entry">
+        <div class="card" style="max-width:700px">
+          <div class="form-row-3">
+            <div class="form-group"><label class="form-label">Direction</label>
+              <select class="form-select" id="fe-dir" onchange="updFeSectors()">
+                <option value="OB">Outbound (RUH→PAK)</option>
+                <option value="IB">Inbound (PAK→RUH)</option>
+              </select></div>
+            <div class="form-group"><label class="form-label">Sector</label><select class="form-select" id="fe-sector"></select></div>
+            <div class="form-group"><label class="form-label">Aircraft Type</label>
+              <select class="form-select" id="fe-ac"><option>320</option><option>777</option><option>777W</option><option>777D</option></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Flight Date</label><input class="form-input" type="date" id="fe-date"></div>
+            <div class="form-group"><label class="form-label">Avg Fare (SAR)</label><input class="form-input" type="number" step="any" id="fe-fare" placeholder="0.00"></div>
+          </div>
+          <div class="form-row-3">
+            <div class="form-group"><label class="form-label">VOC (±)</label><input class="form-input" type="number" step="any" id="fe-voc" placeholder="0.00"></div>
+            <div class="form-group"><label class="form-label">DOC (±)</label><input class="form-input" type="number" step="any" id="fe-doc" placeholder="0.00"></div>
+            <div class="form-group"><label class="form-label">NOC (±)</label><input class="form-input" type="number" step="any" id="fe-noc" placeholder="0.00"></div>
+          </div>
+          <div class="form-group"><label class="form-label">Remarks</label><input class="form-input" id="fe-remarks" placeholder="Optional"></div>
+          <div class="btn-group">
+            <button class="btn btn-accent" onclick="saveFe()">💾 Save Entry</button>
+            <button class="btn btn-ghost" onclick="clrFe()">↺ Clear</button>
+          </div>
+        </div>
+      </div>
+      <div class="tab-pane" id="fe-records">
+        <div class="card">
+          <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.75rem">
+            <select class="form-select" style="width:auto" id="fe-fdir" onchange="renderFeTable()"><option value="">All Directions</option><option value="OB">Outbound</option><option value="IB">Inbound</option></select>
+            <select class="form-select" style="width:auto" id="fe-fsec" onchange="renderFeTable()"><option value="">All Sectors</option></select>
+          </div>
+          <div class="tbl-wrap"><table class="data-table"><thead><tr><th>Date</th><th>By</th><th>Direction</th><th>Sector</th><th>A/C</th><th>Avg Fare</th><th>VOC</th><th>DOC</th><th>NOC</th><th>Remarks</th><th></th></tr></thead><tbody id="fe-tbody"><tr><td colspan="11" class="empty-state">No records</td></tr></tbody></table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPETITORS -->
+    <div class="page" id="page-competitors">
+      <div class="page-header">
+        <div><div class="page-title">Competitor Fares & Analysis</div><div class="page-sub">PIA Benchmark · Fare Alerts · Load Figures</div></div>
+        <div class="header-actions"><button class="btn btn-success btn-sm" onclick="exportExcel('competitors')">⬇ Export Excel</button></div>
+      </div>
+      <div class="tabs">
+        <div class="tab active" onclick="swTab('cf','entry',this)">New Entry</div>
+        <div class="tab" onclick="swTab('cf','records',this)">Records & Alerts</div>
+      </div>
+      <div class="tab-pane active" id="cf-entry">
+        <div class="card" style="max-width:800px">
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Direction</label>
+              <select class="form-select" id="cf-dir" onchange="updCfSectors()">
+                <option value="OB">Outbound (RUH→PAK)</option>
+                <option value="IB">Inbound (PAK→RUH)</option>
+              </select></div>
+            <div class="form-group"><label class="form-label">Sector</label><select class="form-select" id="cf-sector"></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="cf-date"></div>
+            <div class="form-group"><label class="form-label">PIA Fare — Benchmark (SAR)</label><input class="form-input" type="number" step="any" id="cf-pia" placeholder="0.00" oninput="liveFareAlert()"></div>
+          </div>
+          <div class="sec-head">🏷 Competitor Fares (SAR)</div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Saudi Airlines</label><input class="form-input" type="number" step="any" id="cf-sv" placeholder="N/A" oninput="liveFareAlert()"></div>
+            <div class="form-group"><label class="form-label">Flynas</label><input class="form-input" type="number" step="any" id="cf-xq" placeholder="N/A" oninput="liveFareAlert()"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Flyadeal</label><input class="form-input" type="number" step="any" id="cf-f3" placeholder="N/A" oninput="liveFareAlert()"></div>
+            <div class="form-group"><label class="form-label">Airblue</label><input class="form-input" type="number" step="any" id="cf-pa" placeholder="N/A" oninput="liveFareAlert()"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">AirSial</label><input class="form-input" type="number" step="any" id="cf-airsial" placeholder="N/A" oninput="liveFareAlert()"></div>
+            <div class="form-group"><label class="form-label">Fly Jinnah</label><input class="form-input" type="number" step="any" id="cf-9p" placeholder="N/A" oninput="liveFareAlert()"></div>
+          </div>
+          <div class="sec-head">📦 Load Figures (leave blank if unavailable)</div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">PIA Load</label><input class="form-input" type="number" step="any" id="cf-lpia" placeholder="—"></div>
+            <div class="form-group"><label class="form-label">Saudi Airlines Load</label><input class="form-input" type="number" step="any" id="cf-lsv" placeholder="—"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Flynas Load</label><input class="form-input" type="number" step="any" id="cf-lxq" placeholder="—"></div>
+            <div class="form-group"><label class="form-label">Flyadeal Load</label><input class="form-input" type="number" step="any" id="cf-lf3" placeholder="—"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Airblue Load</label><input class="form-input" type="number" step="any" id="cf-lpa" placeholder="—"></div>
+            <div class="form-group"><label class="form-label">AirSial Load</label><input class="form-input" type="number" step="any" id="cf-lai" placeholder="—"></div>
+          </div>
+          <div class="form-group" style="max-width:320px"><label class="form-label">Fly Jinnah Load</label><input class="form-input" type="number" step="any" id="cf-l9p" placeholder="—"></div>
+          <div id="cf-live-alerts" style="margin-top:.75rem"></div>
+          <div class="btn-group">
+            <button class="btn btn-accent" onclick="saveCf()">💾 Save Entry</button>
+            <button class="btn btn-ghost" onclick="clrCf()">↺ Clear</button>
+          </div>
+        </div>
+      </div>
+      <div class="tab-pane" id="cf-records">
+        <div class="card">
+          <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.75rem">
+            <select class="form-select" style="width:auto" id="cf-fdir" onchange="renderCfTable()"><option value="">All Directions</option><option value="OB">Outbound</option><option value="IB">Inbound</option></select>
+            <select class="form-select" style="width:auto" id="cf-fsec" onchange="renderCfTable()"><option value="">All Sectors</option></select>
+          </div>
+          <div id="cf-alert-list" style="margin-bottom:.75rem"></div>
+          <div class="tbl-wrap"><table class="data-table"><thead><tr><th>Date</th><th>By</th><th>Sector</th><th>PIA ★</th><th>Saudia</th><th>Flynas</th><th>Flyadeal</th><th>Airblue</th><th>AirSial</th><th>Fly Jinnah</th><th>Cheapest</th><th>PIA Load</th><th></th></tr></thead><tbody id="cf-tbody"><tr><td colspan="13" class="empty-state">No records</td></tr></tbody></table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TASKS -->
+    <div class="page" id="page-tasks">
+      <div class="page-header">
+        <div><div class="page-title">Task Management</div><div class="page-sub">Assign · Track · Complete</div></div>
+        <div class="header-actions"><button class="btn btn-success btn-sm" onclick="exportExcel('tasks')">⬇ Export Excel</button></div>
+      </div>
+      <div class="grid-2" style="align-items:start;gap:1.25rem">
+        <div class="card">
+          <div class="card-title">➕ New Task</div>
+          <div class="form-group"><label class="form-label">Task Title *</label><input class="form-input" id="t-title" placeholder="Describe the task..."></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Assign To</label>
+              <select class="form-select" id="t-assign" onchange="toggleCustomAssign()">
+                <option>Ruhkkpk</option><option>Ruhabpk</option><option>Ruhfapk</option>
+                <option>Ruhtopk</option><option>Ruhurpk</option><option>Other (free text)</option>
+              </select></div>
+            <div class="form-group"><label class="form-label">Custom Assignee</label><input class="form-input" id="t-custom" placeholder="Enter name..." style="display:none"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Priority</label>
+              <select class="form-select" id="t-priority"><option value="High">🔴 High</option><option value="Medium" selected>🟡 Medium</option><option value="Low">🟢 Low</option></select></div>
+            <div class="form-group"><label class="form-label">Due Date</label><input class="form-input" type="date" id="t-due"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Category</label>
+              <select class="form-select" id="t-cat"><option>Operations</option><option>Finance</option><option>Sales</option><option>Reporting</option><option>Admin</option><option>Other</option></select></div>
+            <div class="form-group"><label class="form-label">Status</label>
+              <select class="form-select" id="t-status"><option>Pending</option><option>In Progress</option><option>Done</option></select></div>
+          </div>
+          <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="t-notes" placeholder="Additional context..."></textarea></div>
+          <div class="btn-group">
+            <button class="btn btn-accent" onclick="saveTask()">➕ Add Task</button>
+            <button class="btn btn-ghost" onclick="clrTask()">↺ Clear</button>
+          </div>
+        </div>
+        <div>
+          <div style="display:flex;gap:.5rem;margin-bottom:.9rem;flex-wrap:wrap">
+            <select class="form-select" style="width:auto;font-size:12px" id="tf-status" onchange="renderTasks()">
+              <option value="">All Statuses</option><option>Pending</option><option>In Progress</option><option>Done</option>
+            </select>
+            <select class="form-select" style="width:auto;font-size:12px" id="tf-assign" onchange="renderTasks()">
+              <option value="">All Assignees</option>
+              <option>Ruhkkpk</option><option>Ruhabpk</option><option>Ruhfapk</option><option>Ruhtopk</option><option>Ruhurpk</option>
+            </select>
+            <select class="form-select" style="width:auto;font-size:12px" id="tf-priority" onchange="renderTasks()">
+              <option value="">All Priorities</option><option>High</option><option>Medium</option><option>Low</option>
+            </select>
+          </div>
+          <div id="task-list"><div class="empty-state"><div class="ei">✅</div>No tasks yet</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANALYSIS (admin only) -->
+    <div class="page" id="page-analysis">
+      <div class="page-header">
+        <div><div class="page-title">Analysis</div><div class="page-sub">Multi-field insights & trends</div></div>
+        <div class="header-actions"><button class="btn btn-success btn-sm" onclick="exportAllExcel()">⬇ Export All Excel</button></div>
+      </div>
+      <div class="card" style="margin-bottom:1rem">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Analysis Type</label>
+            <select class="form-select" id="an-type" onchange="runAnalysis()">
+              <option value="fin-trend">Finance: Sales vs Expenses Trend</option>
+              <option value="sector-fare">Flight Economics: Avg Fare by Sector</option>
+              <option value="voc-noc">Flight Economics: VOC / DOC / NOC</option>
+              <option value="comp-fare">Competitor: Avg Fare Comparison</option>
+              <option value="pnl-breakdown">Finance: P&L Breakdown by Period</option>
+            </select></div>
+          <div class="form-group"><label class="form-label">Sector Filter</label>
+            <select class="form-select" id="an-sector" onchange="runAnalysis()"><option value="">All Sectors</option></select></div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="position:relative;height:320px"><canvas id="anChart" role="img" aria-label="Analysis chart">Chart data</canvas></div>
+      </div>
+      <div class="card" style="margin-top:1rem;font-size:13px" id="an-summary"><p style="color:var(--muted)">Select an analysis type to view insights.</p></div>
+    </div>
+
+    <!-- USER MANAGEMENT (admin only) -->
+    <div class="page" id="page-users">
+      <div class="page-header">
+        <div><div class="page-title">User Management</div><div class="page-sub">Add · Edit · Remove authorised users</div></div>
+      </div>
+      <div class="grid-2" style="align-items:start;gap:1.25rem">
+        <div class="card">
+          <div class="card-title">➕ Add / Update User</div>
+          <div class="form-group"><label class="form-label">User ID (login name)</label><input class="form-input" id="u-id" placeholder="e.g. ruhkkpk" style="font-family:var(--mono)"></div>
+          <div class="form-group"><label class="form-label">Display Name</label><input class="form-input" id="u-name" placeholder="Full name"></div>
+          <div class="form-group"><label class="form-label">Password</label><input type="password" class="form-input" id="u-pass" placeholder="Min 6 characters"></div>
+          <div class="form-group"><label class="form-label">Role</label>
+            <select class="form-select" id="u-role" onchange="toggleAdminFields()">
+              <option value="user">User</option><option value="admin">Admin</option>
+            </select></div>
+          <div id="u-perms" style="margin-bottom:1rem">
+            <label class="form-label" style="margin-bottom:.5rem">Form Access</label>
+            <div style="display:flex;flex-direction:column;gap:.4rem">
+              <label style="display:flex;align-items:center;gap:.5rem;font-size:13px;cursor:pointer"><input type="checkbox" id="up-finance" checked> Finance</label>
+              <label style="display:flex;align-items:center;gap:.5rem;font-size:13px;cursor:pointer"><input type="checkbox" id="up-flightecon"> Flight Economics</label>
+              <label style="display:flex;align-items:center;gap:.5rem;font-size:13px;cursor:pointer"><input type="checkbox" id="up-competitors" checked> Competitor Fares</label>
+              <label style="display:flex;align-items:center;gap:.5rem;font-size:13px;cursor:pointer"><input type="checkbox" id="up-tasks" checked> Tasks</label>
+            </div>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-accent" onclick="saveUser()">💾 Save User</button>
+            <button class="btn btn-ghost" onclick="clrUser()">↺ Clear</button>
+          </div>
+        </div>
+        <div>
+          <div class="card-title" style="margin-bottom:.75rem">👥 Authorised Users</div>
+          <div id="user-list"><div class="empty-state">Loading...</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   RUH STATION MANAGER — MAIN SCRIPT (fixed)
+   ═══════════════════════════════════════════════ */
+const CONFIG_KEY='ruh_fb_config';
+const ADMIN_ID='ruhuupk';
+
+let db,currentUser=null,currentRole=null,currentPerms={};
+let allData={finance:[],flightecon:[],competitors:[],tasks:[]};
+let usersMap={};
+let dashCharts={},anChart=null;
+
+function getConfig(){try{return JSON.parse(localStorage.getItem(CONFIG_KEY))}catch{return null}}
+function saveFirebaseConfig(){
+  const cfg={
+    apiKey:g('s-apikey').value.trim(),
+    authDomain:g('s-authdomain').value.trim(),
+    databaseURL:g('s-dburl').value.trim(),
+    projectId:g('s-projectid').value.trim(),
+    appId:g('s-appid').value.trim()
+  };
+  if(!cfg.apiKey||!cfg.databaseURL){alert('API Key and Database URL are required');return}
+  localStorage.setItem(CONFIG_KEY,JSON.stringify(cfg));
+  location.reload();
+}
+
+function initFirebase(){
+  const cfg=getConfig();
+  if(!cfg||!cfg.apiKey){
+    hide('loading');
+    document.getElementById('setup-screen').style.display='flex';
+    return false;
+  }
+  try{
+    firebase.initializeApp(cfg);
+    db=firebase.database();
+    return true;
+  }catch(e){
+    hide('loading');
+    document.getElementById('setup-screen').style.display='flex';
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════
+const g=id=>document.getElementById(id);
+const v=id=>g(id)?g(id).value:'';
+const n=id=>parseFloat(g(id)?g(id).value:0)||0;
+const hide=id=>{if(g(id))g(id).style.display='none'};
+const show=(id,d='block')=>{if(g(id))g(id).style.display=d};
+const SECTORS=['ISB','LHE','MUX','SKT','PEW','KHI','LYP'];
+const today=()=>new Date().toISOString().split('T')[0];
+const nowISO=()=>new Date().toISOString();
+
+function toast(msg,type='ok'){
+  const t=g('toast');
+  t.textContent=msg;
+  t.className='toast '+(type==='ok'?'toast-ok':'toast-err');
+  t.style.display='block';
+  setTimeout(()=>t.style.display='none',2400);
+}
+
+// ═══════════════════════════════════════════════
+// SIMPLE HASH (for password storage — not cryptographic)
+// ═══════════════════════════════════════════════
+function simpleHash(str){
+  var hash=0;
+  for(var i=0;i<str.length;i++){
+    var ch=str.charCodeAt(i);
+    hash=((hash<<5)-hash)+ch;
+    hash=hash&hash;
+  }
+  return 'h'+Math.abs(hash).toString(36);
+}
+
+// ═══════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════
+function doLogin(){
+  const uid=g('login-user').value.trim().toLowerCase();
+  const pass=g('login-pass').value;
+  if(!uid||!pass){showAuthErr('Please enter User ID and password');return;}
+  g('login-btn').disabled=true;g('login-btn').textContent='Signing in...';
+  show('loading');
+  db.ref('users/'+uid).once('value').then(function(snap){
+    const user=snap.val();
+    if(!user||!user.active){
+      hideLoading();showAuthErr('User not found or access revoked.');
+      g('login-btn').disabled=false;g('login-btn').textContent='Sign In →';return;
+    }
+    if(user.pwHash!==simpleHash(pass)){
+      hideLoading();showAuthErr('Incorrect password.');
+      g('login-btn').disabled=false;g('login-btn').textContent='Sign In →';return;
+    }
+    currentUser=uid;currentRole=user.role||'user';
+    currentPerms=user.perms||{finance:true,competitors:true,tasks:true};
+    g('pill-user').textContent=uid;
+    g('pill-role').textContent=currentRole==='admin'?'Admin':'User';
+    g('pill-role').className='role-tag '+(currentRole==='admin'?'role-admin':'role-user');
+    applyRoleUI();
+    hide('auth-screen');show('app');
+    hideLoading();
+    const firstPage=currentRole==='admin'?'dashboard':'finance';
+    const firstNav=g('nav-'+(currentRole==='admin'?'dashboard':'finance'));
+    showPage(firstPage,firstNav);
+    subscribeAllData();
+  }).catch(function(err){
+    hideLoading();showAuthErr('Connection error: '+err.message);
+    g('login-btn').disabled=false;g('login-btn').textContent='Sign In →';
+  });
+}
+
+function hideLoading(){hide('loading')}
+function showAuthErr(msg){g('auth-err').textContent=msg;show('auth-err')}
+
+function doLogout(){
+  currentUser=null;currentRole=null;currentPerms={};
+  hide('app');show('auth-screen');
+  g('login-user').value='';g('login-pass').value='';
+  hide('auth-err');
+  allData={finance:[],flightecon:[],competitors:[],tasks:[]};
+  try{db.ref('finance').off();db.ref('flightecon').off();db.ref('competitors').off();db.ref('tasks').off();db.ref('users').off();}catch(e){}
+}
+
+function applyRoleUI(){
+  if(currentRole==='admin'){
+    show('nav-dashboard');show('nav-flightecon');show('nav-analysis');show('nav-users');show('ng-admin');
+  } else {
+    hide('nav-dashboard');
+    if(!currentPerms.flightecon)hide('nav-flightecon');
+    if(!currentPerms.finance)hide('nav-finance');
+    if(!currentPerms.competitors)hide('nav-competitors');
+    if(!currentPerms.tasks)hide('nav-tasks');
+    hide('nav-analysis');hide('nav-users');hide('ng-admin');
+  }
+  if(currentRole==='admin'){
+    g('fin-export-btn').innerHTML='<button class="btn btn-success btn-sm" onclick="exportExcel(\'finance\')">⬇ Export Excel</button>';
+  }
+}
+
+// ═══════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════
+function showPage(pg,navEl){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const pageEl=g('page-'+pg);
+  if(pageEl)pageEl.classList.add('active');
+  if(navEl)navEl.classList.add('active');
+  if(pg==='dashboard')refreshDashboard();
+  if(pg==='analysis'){populateAnSectors();runAnalysis();}
+  if(pg==='users')renderUserList();
+  if(pg==='finance')renderFinTable();
+  if(pg==='flightecon'){renderFeTable();populateFeSectorFilter();}
+  if(pg==='competitors'){renderCfTable();populateCfSectorFilter();}
+  if(pg==='tasks')renderTasks();
+}
+
+function swTab(form,pane,el){
+  el.closest('.tabs').querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  const prefix=form+'-';
+  document.querySelectorAll('[id^="'+prefix+'"]').forEach(p=>{if(p.classList.contains('tab-pane'))p.classList.remove('active')});
+  g(prefix+pane).classList.add('active');
+  if(form==='fin'&&pane==='records')renderFinTable();
+  if(form==='fe'&&pane==='records'){renderFeTable();populateFeSectorFilter();}
+  if(form==='cf'&&pane==='records'){renderCfTable();populateCfSectorFilter();}
+}
+
+// ═══════════════════════════════════════════════
+// REAL-TIME SUBSCRIPTIONS
+// ═══════════════════════════════════════════════
+function subscribeAllData(){
+  db.ref('finance').on('value',snap=>{
+    allData.finance=objToArr(snap.val());
+    renderFinTable();refreshDashboard();
+  });
+  db.ref('flightecon').on('value',snap=>{
+    allData.flightecon=objToArr(snap.val());
+    renderFeTable();refreshDashboard();
+  });
+  db.ref('competitors').on('value',snap=>{
+    allData.competitors=objToArr(snap.val());
+    renderCfTable();refreshDashboard();populateCfSectorFilter();populateAnSectors();
+  });
+  db.ref('tasks').on('value',snap=>{
+    allData.tasks=objToArr(snap.val());
+    renderTasks();updateTaskBadge();refreshDashboard();
+  });
+  db.ref('users').on('value',snap=>{
+    usersMap=snap.val()||{};
+    renderUserList();
+  });
+  g('sync-dot').classList.remove('offline');
+  g('sync-label').textContent='Live sync';
+}
+
+function objToArr(obj){
+  if(!obj)return[];
+  return Object.entries(obj).map(([k,v])=>({...v,_key:k})).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+}
+
+// ═══════════════════════════════════════════════
+// FINANCE
+// ═══════════════════════════════════════════════
+function calcFin(){
+  const sales=n('f-bsp')+n('f-counter')+n('f-va')+n('f-cargo')+n('f-dip')+n('f-ebt')+n('f-misc-sale');
+  const exp=n('f-rac')+n('f-gaca')+n('f-swiss')+n('f-fuel')+n('f-sal')+n('f-util')+n('f-misc-exp');
+  const pnl=sales-exp;
+  g('f-ts').textContent='SAR '+sales.toFixed(2);
+  g('f-te').textContent='SAR '+exp.toFixed(2);
+  const pe=g('f-pnl');
+  pe.textContent='SAR '+(pnl>=0?'+':'')+pnl.toFixed(2);
+  pe.style.color=pnl>=0?'var(--success)':'var(--danger)';
+  return{sales,exp,pnl};
+}
+
+function saveFin(){
+  const t=calcFin();
+  const rec={
+    period:v('fin-period'),remarks:v('fin-remarks'),
+    bsp:n('f-bsp'),counter:n('f-counter'),va:n('f-va'),cargo:n('f-cargo'),
+    dip:n('f-dip'),ebt:n('f-ebt'),miscSale:n('f-misc-sale'),
+    rac:n('f-rac'),gaca:n('f-gaca'),swiss:n('f-swiss'),fuel:n('f-fuel'),
+    sal:n('f-sal'),util:n('f-util'),miscExp:n('f-misc-exp'),
+    totalSales:t.sales,totalExp:t.exp,pnl:t.pnl,
+    by:currentUser,createdAt:nowISO()
+  };
+  db.ref('finance').push(rec).then(()=>toast('✅ Finance record saved')).catch(e=>toast('❌ '+e.message,'err'));
+  clrFin();
+}
+
+function clrFin(){
+  ['f-bsp','f-counter','f-va','f-cargo','f-dip','f-ebt','f-misc-sale','f-rac','f-gaca','f-swiss','f-fuel','f-sal','f-util','f-misc-exp','fin-remarks'].forEach(id=>g(id)&&(g(id).value=''));
+  calcFin();
+}
+
+function renderFinTable(){
+  const tb=g('fin-tbody');if(!tb)return;
+  const rows=allData.finance;
+  if(!rows.length){tb.innerHTML='<tr><td colspan="21" class="empty-state"><div class="ei">📄</div>No finance records</td></tr>';return}
+  tb.innerHTML=rows.map(r=>`<tr>
+    <td class="num">${r.period||'—'}</td>
+    <td><span class="badge b-gray" style="font-family:var(--mono)">${r.by||'—'}</span></td>
+    <td class="num">${fmtN(r.bsp)}</td><td class="num">${fmtN(r.counter)}</td>
+    <td class="num">${fmtN(r.va)}</td><td class="num">${fmtN(r.cargo)}</td>
+    <td class="num">${fmtN(r.dip)}</td><td class="num">${fmtN(r.ebt)}</td>
+    <td class="num">${fmtN(r.miscSale)}</td>
+    <td class="num pos">${fmtN(r.totalSales)}</td>
+    <td class="num">${fmtN(r.rac)}</td><td class="num">${fmtN(r.gaca)}</td>
+    <td class="num">${fmtN(r.swiss)}</td><td class="num">${fmtN(r.fuel)}</td>
+    <td class="num">${fmtN(r.sal)}</td><td class="num">${fmtN(r.util)}</td>
+    <td class="num">${fmtN(r.miscExp)}</td>
+    <td class="num neg">${fmtN(r.totalExp)}</td>
+    <td class="num ${r.pnl>=0?'pos':'neg'}">${(r.pnl>=0?'+':'')+fmtN(r.pnl)}</td>
+    <td>${r.remarks||'—'}</td>
+    ${canDelete(r)?`<td><button class="btn btn-danger btn-sm" onclick="delRec('finance','${r._key}')">🗑</button></td>`:'<td></td>'}
+  </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════
+// FLIGHT ECONOMICS
+// ═══════════════════════════════════════════════
+function updFeSectors(){
+  const dir=v('fe-dir'),sel=g('fe-sector');sel.innerHTML='';
+  SECTORS.forEach(s=>{const o=new Option(dir==='OB'?`RUH→${s}`:`${s}→RUH`,s);sel.appendChild(o)});
+}
+function saveFe(){
+  const rec={
+    date:v('fe-date'),dir:v('fe-dir'),sector:v('fe-sector'),ac:v('fe-ac'),
+    fare:n('fe-fare'),voc:n('fe-voc'),doc:n('fe-doc'),noc:n('fe-noc'),
+    remarks:v('fe-remarks'),by:currentUser,createdAt:nowISO()
+  };
+  db.ref('flightecon').push(rec).then(()=>toast('✅ Flight economics saved')).catch(e=>toast('❌ '+e.message,'err'));
+  clrFe();
+}
+function clrFe(){['fe-fare','fe-voc','fe-doc','fe-noc','fe-remarks'].forEach(id=>g(id)&&(g(id).value=''))}
+function populateFeSectorFilter(){
+  const sel=g('fe-fsec');if(!sel)return;const cur=sel.value;
+  sel.innerHTML='<option value="">All Sectors</option>';
+  [...new Set(allData.flightecon.map(r=>r.sector))].forEach(s=>sel.appendChild(new Option(s,s)));
+  sel.value=cur;
+}
+function renderFeTable(){
+  const tb=g('fe-tbody');if(!tb)return;
+  const dir=v('fe-fdir'),sec=v('fe-fsec');
+  const rows=allData.flightecon.filter(r=>(!dir||r.dir===dir)&&(!sec||r.sector===sec));
+  if(!rows.length){tb.innerHTML='<tr><td colspan="11" class="empty-state">No records</td></tr>';return}
+  tb.innerHTML=rows.map(r=>`<tr>
+    <td class="num">${r.date}</td>
+    <td><span class="badge b-gray" style="font-family:var(--mono)">${r.by||'—'}</span></td>
+    <td><span class="badge ${r.dir==='OB'?'b-blue':'b-teal'}">${r.dir==='OB'?'Outbound':'Inbound'}</span></td>
+    <td>${r.dir==='OB'?'RUH→'+r.sector:r.sector+'→RUH'}</td>
+    <td><span class="badge b-gray">${r.ac}</span></td>
+    <td class="num">${fmtN(r.fare)}</td>
+    <td class="num ${r.voc>=0?'pos':'neg'}">${sgn(r.voc)}</td>
+    <td class="num ${r.doc>=0?'pos':'neg'}">${sgn(r.doc)}</td>
+    <td class="num ${r.noc>=0?'pos':'neg'}">${sgn(r.noc)}</td>
+    <td>${r.remarks||'—'}</td>
+    ${canDelete(r)?`<td><button class="btn btn-danger btn-sm" onclick="delRec('flightecon','${r._key}')">🗑</button></td>`:'<td></td>'}
+  </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════
+// COMPETITORS
+// ═══════════════════════════════════════════════
+function updCfSectors(){
+  const dir=v('cf-dir'),sel=g('cf-sector');sel.innerHTML='';
+  SECTORS.forEach(s=>sel.appendChild(new Option(dir==='OB'?`RUH→${s}`:`${s}→RUH`,s)));
+}
+function liveFareAlert(){
+  const pia=n('cf-pia');const el=g('cf-live-alerts');if(!el)return;
+  if(!pia){el.innerHTML='';return}
+  const comp=[
+    {n:'Saudi Airlines',v:n('cf-sv')},{n:'Flynas',v:n('cf-xq')},{n:'Flyadeal',v:n('cf-f3')},
+    {n:'Airblue',v:n('cf-pa')},{n:'AirSial',v:n('cf-airsial')},{n:'Fly Jinnah',v:n('cf-9p')}
+  ];
+  let html='';
+  comp.filter(c=>c.v).forEach(c=>{
+    const d=c.v-pia,pct=((Math.abs(d)/pia)*100).toFixed(1);
+    const arrow = d<0 ? '⬇' : (d>0 ? '⬆' : '=');
+    const cls   = d<0 ? 'fb-below' : (d>0 ? 'fb-above' : 'fb-equal');
+    const label = d<0 ? pct+'% below PIA' : (d>0 ? pct+'% above PIA' : 'Same as PIA');
+    html += '<div class="fare-bar '+cls+'">'+arrow+' '+c.n+': SAR '+c.v.toFixed(0)+' \u2014 '+label+'</div>';
+  });
+  el.innerHTML=html;
+}
+function saveCf(){
+  const rec={
+    date:v('cf-date'),dir:v('cf-dir'),sector:v('cf-sector'),
+    pia:n('cf-pia'),sv:n('cf-sv'),xq:n('cf-xq'),f3:n('cf-f3'),pa:n('cf-pa'),airsial:n('cf-airsial'),p9:n('cf-9p'),
+    lpia:g('cf-lpia').value,lsv:g('cf-lsv').value,lxq:g('cf-lxq').value,
+    lf3:g('cf-lf3').value,lpa:g('cf-lpa').value,lai:g('cf-lai').value,l9p:g('cf-l9p').value,
+    by:currentUser,createdAt:nowISO()
+  };
+  db.ref('competitors').push(rec).then(()=>toast('✅ Competitor fares saved')).catch(e=>toast('❌ '+e.message,'err'));
+  clrCf();
+}
+function clrCf(){
+  ['cf-pia','cf-sv','cf-xq','cf-f3','cf-pa','cf-airsial','cf-9p','cf-lpia','cf-lsv','cf-lxq','cf-lf3','cf-lpa','cf-lai','cf-l9p'].forEach(id=>g(id)&&(g(id).value=''));
+  if(g('cf-live-alerts'))g('cf-live-alerts').innerHTML='';
+}
+function populateCfSectorFilter(){
+  const sel=g('cf-fsec');if(!sel)return;const cur=sel.value;
+  sel.innerHTML='<option value="">All Sectors</option>';
+  [...new Set(allData.competitors.map(r=>r.sector))].forEach(s=>sel.appendChild(new Option(s,s)));
+  sel.value=cur;
+}
+function renderCfTable(){
+  const tb=g('cf-tbody');if(!tb)return;
+  const dir=v('cf-fdir'),sec=v('cf-fsec');
+  const rows=allData.competitors.filter(r=>(!dir||r.dir===dir)&&(!sec||r.sector===sec));
+  // Build alerts
+  const al=g('cf-alert-list');
+  if(al){
+    let alerts='';
+    rows.forEach(r=>{
+      if(!r.pia)return;
+      const cheap=[{n:'Saudia',v:r.sv},{n:'Flynas',v:r.xq},{n:'Flyadeal',v:r.f3},{n:'Airblue',v:r.pa},{n:'AirSial',v:r.airsial},{n:'Fly Jinnah',v:r.p9}].filter(c=>c.v&&c.v<r.pia);
+      if(cheap.length)alerts+=`<div class="alert a-warn">⚠ ${r.date} ${r.dir==='OB'?'RUH→'+r.sector:r.sector+'→RUH'}: ${cheap.map(c=>c.n+' SAR '+c.v.toFixed(0)).join(', ')} cheaper than PIA (SAR ${r.pia.toFixed(0)})</div>`;
+    });
+    al.innerHTML=alerts||'<div class="alert a-success">✅ No undercut alerts for current filter</div>';
+  }
+  if(!rows.length){tb.innerHTML='<tr><td colspan="13" class="empty-state">No records</td></tr>';return}
+  tb.innerHTML=rows.map(r=>{
+    const fares=[{n:'PIA',v:r.pia},{n:'Saudia',v:r.sv},{n:'Flynas',v:r.xq},{n:'Flyadeal',v:r.f3},{n:'Airblue',v:r.pa},{n:'AirSial',v:r.airsial},{n:'Fly Jinnah',v:r.p9}].filter(f=>f.v);
+    const cheapest=fares.length?fares.reduce((a,b)=>a.v<b.v?a:b):null;
+    return`<tr>
+      <td class="num">${r.date}</td>
+      <td><span class="badge b-gray" style="font-family:var(--mono)">${r.by||'—'}</span></td>
+      <td>${r.dir==='OB'?'RUH→'+r.sector:r.sector+'→RUH'}</td>
+      <td class="num"><b>${r.pia?r.pia.toFixed(0):'—'}</b></td>
+      <td class="num">${r.sv?r.sv.toFixed(0):'—'}</td><td class="num">${r.xq?r.xq.toFixed(0):'—'}</td>
+      <td class="num">${r.f3?r.f3.toFixed(0):'—'}</td><td class="num">${r.pa?r.pa.toFixed(0):'—'}</td>
+      <td class="num">${r.airsial?r.airsial.toFixed(0):'—'}</td><td class="num">${r.p9?r.p9.toFixed(0):'—'}</td>
+      <td>${cheapest?`<span class="badge ${cheapest.n==='PIA'?'b-green':'b-red'}">${cheapest.n} ${cheapest.v.toFixed(0)}</span>`:'—'}</td>
+      <td class="num">${r.lpia||'—'}</td>
+      ${canDelete(r)?`<td><button class="btn btn-danger btn-sm" onclick="delRec('competitors','${r._key}')">🗑</button></td>`:'<td></td>'}
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// TASKS
+// ═══════════════════════════════════════════════
+function toggleCustomAssign(){
+  const isOther=v('t-assign')==='Other (free text)';
+  g('t-custom').style.display=isOther?'block':'none';
+  if(!isOther)g('t-custom').value='';
+}
+function saveTask(){
+  const title=v('t-title').trim();if(!title){toast('Please enter a task title','err');return}
+  const assign=v('t-assign')==='Other (free text)'?v('t-custom').trim():v('t-assign');
+  const rec={
+    title,assign,priority:v('t-priority'),due:v('t-due'),
+    category:v('t-cat'),status:v('t-status'),notes:v('t-notes'),
+    done:false,by:currentUser,createdAt:nowISO()
+  };
+  db.ref('tasks').push(rec).then(()=>toast('✅ Task added')).catch(e=>toast('❌ '+e.message,'err'));
+  clrTask();
+}
+function clrTask(){['t-title','t-custom','t-notes'].forEach(id=>g(id)&&(g(id).value=''));g('t-status').value='Pending'}
+function toggleTask(key,done){
+  db.ref('tasks/'+key).update({done:!done,status:!done?'Done':'Pending'});
+}
+function renderTasks(){
+  const fs=v('tf-status'),fa=v('tf-assign'),fp=v('tf-priority');
+  let tasks=allData.tasks.filter(t=>(!fs||t.status===fs)&&(!fa||t.assign===fa)&&(!fp||t.priority===fp));
+  tasks.sort((a,b)=>{const p={High:0,Medium:1,Low:2};return p[a.priority]-p[b.priority]});
+  const el=g('task-list');if(!el)return;
+  if(!tasks.length){el.innerHTML='<div class="empty-state"><div class="ei">✅</div>No tasks match filter</div>';return}
+  const sb={Pending:'b-gold',Done:'b-green','In Progress':'b-blue'};
+  const pc={High:'ph',Medium:'pm',Low:'pl'};
+  el.innerHTML=tasks.map(t=>`<div class="task-item">
+    <input type="checkbox" class="task-cb" ${t.done?'checked':''} onchange="toggleTask('${t._key}',${t.done})">
+    <div class="task-body">
+      <div class="task-title ${t.done?'done':''}">${t.title}</div>
+      <div class="task-meta">
+        <span><span class="p-dot ${pc[t.priority]}"></span>${t.priority}</span>
+        <span>👤 ${t.assign}</span>
+        <span>📁 ${t.category}</span>
+        ${t.due?`<span>📅 ${t.due}</span>`:''}
+        <span class="badge ${sb[t.status]||'b-gray'}">${t.status}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">by ${t.by}</span>
+      </div>
+      ${t.notes?`<div class="task-note">${t.notes}</div>`:''}
+    </div>
+    ${canDelete(t)?`<button class="btn btn-danger btn-sm" style="flex-shrink:0" onclick="delRec('tasks','${t._key}')">🗑</button>`:''}
+  </div>`).join('');
+}
+function updateTaskBadge(){
+  const open=allData.tasks.filter(t=>t.status!=='Done').length;
+  const b=g('task-badge');if(!b)return;
+  if(open>0){b.textContent=open;b.style.display='inline'}else b.style.display='none';
+}
+
+// ═══════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════
+function refreshDashboard(){
+  if(currentRole!=='admin')return;
+  g('dash-date-sub').textContent=new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const fin=allData.finance;
+  const ts=fin.reduce((a,r)=>a+(r.totalSales||0),0);
+  const te=fin.reduce((a,r)=>a+(r.totalExp||0),0);
+  const pnl=ts-te;
+  const open=allData.tasks.filter(t=>t.status!=='Done').length;
+  g('dm-sales').textContent='SAR '+ts.toLocaleString(undefined,{maximumFractionDigits:0});
+  g('dm-exp').textContent='SAR '+te.toLocaleString(undefined,{maximumFractionDigits:0});
+  const pnlEl=g('dm-pnl');
+  pnlEl.textContent='SAR '+(pnl>=0?'+':'')+pnl.toLocaleString(undefined,{maximumFractionDigits:0});
+  pnlEl.className='metric-val '+(pnl>=0?'pos':'neg');
+  g('dm-tasks').textContent=open;
+
+  // Sales chart
+  const sl=['BSP','Counter','VA','Cargo','DIP','EBT','Misc'];
+  const sd=[fin.reduce((a,r)=>a+(r.bsp||0),0),fin.reduce((a,r)=>a+(r.counter||0),0),
+    fin.reduce((a,r)=>a+(r.va||0),0),fin.reduce((a,r)=>a+(r.cargo||0),0),
+    fin.reduce((a,r)=>a+(r.dip||0),0),fin.reduce((a,r)=>a+(r.ebt||0),0),
+    fin.reduce((a,r)=>a+(r.miscSale||0),0)];
+  if(dashCharts.sales)dashCharts.sales.destroy();
+  dashCharts.sales=new Chart(g('chartSales'),{type:'bar',
+    data:{labels:sl,datasets:[{label:'SAR',data:sd,backgroundColor:'#0077b6',borderRadius:5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{beginAtZero:true,ticks:{callback:v=>'SAR '+v.toLocaleString()}}}}});
+
+  const ed=[fin.reduce((a,r)=>a+(r.rac||0),0),fin.reduce((a,r)=>a+(r.gaca||0),0),
+    fin.reduce((a,r)=>a+(r.swiss||0),0),fin.reduce((a,r)=>a+(r.fuel||0),0),
+    fin.reduce((a,r)=>a+(r.sal||0),0),fin.reduce((a,r)=>a+(r.util||0),0),
+    fin.reduce((a,r)=>a+(r.miscExp||0),0)];
+  const el2=['RAC','GACA','Swissport','Fuel','Salaries','Utilities','Misc'];
+  if(dashCharts.exp)dashCharts.exp.destroy();
+  dashCharts.exp=new Chart(g('chartExp'),{type:'doughnut',
+    data:{labels:el2,datasets:[{data:ed,backgroundColor:['#c0392b','#e74c3c','#e67e22','#f39c12','#8e44ad','#2980b9','#27ae60'],borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},padding:8,boxWidth:12}}}}});
+
+  // Recent flights
+  const ftb=g('dash-fe-body');
+  const fe=allData.flightecon.slice(0,6);
+  ftb.innerHTML=fe.length?fe.map(r=>`<tr>
+    <td class="num">${r.date}</td>
+    <td>${r.dir==='OB'?'RUH→'+r.sector:r.sector+'→RUH'}</td>
+    <td><span class="badge b-gray">${r.ac}</span></td>
+    <td class="num ${r.voc>=0?'pos':'neg'}">${sgn(r.voc)}</td>
+    <td class="num ${r.doc>=0?'pos':'neg'}">${sgn(r.doc)}</td>
+    <td class="num ${r.noc>=0?'pos':'neg'}">${sgn(r.noc)}</td>
+  </tr>`).join(''):'<tr><td colspan="6" class="empty-state">No data</td></tr>';
+
+  // Fare alerts
+  const alerts=[];
+  allData.competitors.slice(0,15).forEach(r=>{
+    if(!r.pia)return;
+    [{n:'Saudia',v:r.sv},{n:'Flynas',v:r.xq},{n:'Flyadeal',v:r.f3},{n:'Airblue',v:r.pa},{n:'AirSial',v:r.airsial},{n:'Fly Jinnah',v:r.p9}]
+      .filter(c=>c.v&&c.v<r.pia).forEach(c=>alerts.push(`<div class="alert a-warn" style="font-size:11px;margin-bottom:4px">⚠ ${r.sector} ${r.date}: ${c.n} SAR ${c.v.toFixed(0)} < PIA SAR ${r.pia.toFixed(0)}</div>`));
+  });
+  g('dash-alerts').innerHTML=alerts.slice(0,6).join('')||'<div class="alert a-success" style="font-size:12px">✅ No active fare undercut alerts</div>';
+}
+
+// ═══════════════════════════════════════════════
+// ANALYSIS
+// ═══════════════════════════════════════════════
+function populateAnSectors(){
+  const sel=g('an-sector');if(!sel)return;const cur=sel.value;
+  sel.innerHTML='<option value="">All Sectors</option>';
+  [...new Set([...allData.flightecon.map(r=>r.sector),...allData.competitors.map(r=>r.sector)])].forEach(s=>sel.appendChild(new Option(s,s)));
+  sel.value=cur;
+}
+function runAnalysis(){
+  if(!g('page-analysis').classList.contains('active'))return;
+  const type=v('an-type'),sec=v('an-sector');
+  const canvas=g('anChart');if(!canvas)return;
+  if(anChart){anChart.destroy();anChart=null;}
+  const sum=g('an-summary');
+
+  if(type==='fin-trend'){
+    const rows=[...allData.finance].sort((a,b)=>a.period>b.period?1:-1);
+    anChart=new Chart(canvas,{type:'line',
+      data:{labels:rows.map(r=>r.period||'?'),datasets:[
+        {label:'Sales',data:rows.map(r=>r.totalSales||0),borderColor:'#0077b6',backgroundColor:'rgba(0,119,182,.1)',fill:true,tension:.4},
+        {label:'Expenses',data:rows.map(r=>r.totalExp||0),borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,.08)',fill:true,tension:.4},
+        {label:'P&L',data:rows.map(r=>r.pnl||0),borderColor:'#2ecc71',borderDash:[5,5],tension:.4}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>'SAR '+v.toLocaleString()}}}}});
+    sum.innerHTML=rows.length?`<b>${rows.length}</b> period(s). Avg monthly P&L: <b>SAR ${(rows.reduce((a,r)=>a+(r.pnl||0),0)/rows.length).toFixed(0)}</b>`:'No data.';
+  }
+  else if(type==='sector-fare'){
+    const rows=allData.flightecon.filter(r=>!sec||r.sector===sec);
+    const map={};rows.forEach(r=>{if(!map[r.sector])map[r.sector]=[];map[r.sector].push(r.fare||0)});
+    const labels=Object.keys(map);const avgs=labels.map(s=>avg(map[s]));
+    anChart=new Chart(canvas,{type:'bar',
+      data:{labels,datasets:[{label:'Avg Fare (SAR)',data:avgs.map(v=>+v.toFixed(2)),backgroundColor:'#0077b6',borderRadius:5}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+    sum.innerHTML=labels.map((l,i)=>`<b>${l}</b>: SAR ${avgs[i].toFixed(0)}`).join(' &nbsp;|&nbsp; ')||'No data.';
+  }
+  else if(type==='voc-noc'){
+    const rows=allData.flightecon.filter(r=>!sec||r.sector===sec);
+    const map={};rows.forEach(r=>{if(!map[r.sector])map[r.sector]={voc:[],doc:[],noc:[]};map[r.sector].voc.push(r.voc||0);map[r.sector].doc.push(r.doc||0);map[r.sector].noc.push(r.noc||0)});
+    const labels=Object.keys(map);
+    anChart=new Chart(canvas,{type:'bar',
+      data:{labels,datasets:[
+        {label:'VOC',data:labels.map(s=>+avg(map[s].voc).toFixed(2)),backgroundColor:'#0077b6',borderRadius:4},
+        {label:'DOC',data:labels.map(s=>+avg(map[s].doc).toFixed(2)),backgroundColor:'#e67e22',borderRadius:4},
+        {label:'NOC',data:labels.map(s=>+avg(map[s].noc).toFixed(2)),backgroundColor:'#2ecc71',borderRadius:4}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>(v>=0?'+':'')+v}}}}});
+    sum.innerHTML=labels.length?`Positive NOC = profitable sector. Sectors: <b>${labels.join(', ')}</b>`:'No data.';
+  }
+  else if(type==='comp-fare'){
+    const rows=allData.competitors.filter(r=>!sec||r.sector===sec);
+    const keys=['pia','sv','xq','f3','pa','airsial','p9'];
+    const names=['PIA','Saudia','Flynas','Flyadeal','Airblue','AirSial','Fly Jinnah'];
+    const colors=['#003f7f','#006428','#c0392b','#8e44ad','#e67e22','#2980b9','#16a085'];
+    const avgs=keys.map(k=>{const vals=rows.filter(r=>r[k]).map(r=>r[k]);return vals.length?avg(vals):0});
+    anChart=new Chart(canvas,{type:'bar',
+      data:{labels:names,datasets:[{label:'Avg Fare (SAR)',data:avgs.map(v=>+v.toFixed(0)),backgroundColor:colors,borderRadius:5}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+    const piaAvg=avgs[0];const compMin=Math.min(...avgs.slice(1).filter(v=>v>0));
+    sum.innerHTML=`PIA avg: <b>SAR ${piaAvg.toFixed(0)}</b>. Cheapest competitor avg: <b>SAR ${compMin.toFixed(0)}</b>. ${compMin<piaAvg?'⚠ Competitors undercutting PIA.':'✅ PIA is most competitive.'}`;
+  }
+  else if(type==='pnl-breakdown'){
+    const rows=[...allData.finance].sort((a,b)=>a.period>b.period?1:-1);
+    anChart=new Chart(canvas,{type:'bar',
+      data:{labels:rows.map(r=>r.period||'?'),datasets:[
+        {label:'Sales',data:rows.map(r=>r.totalSales||0),backgroundColor:'rgba(0,119,182,.7)',borderRadius:3},
+        {label:'Expenses',data:rows.map(r=>-(r.totalExp||0)),backgroundColor:'rgba(231,76,60,.7)',borderRadius:3}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,
+        scales:{y:{ticks:{callback:v=>'SAR '+(v<0?'-':'')+Math.abs(v).toLocaleString()},stacked:false}},
+        plugins:{tooltip:{callbacks:{label:ctx=>'SAR '+Math.abs(ctx.raw).toLocaleString()}}}}});
+    sum.innerHTML=rows.length?`Finance P&L across <b>${rows.length}</b> period(s). Total net: <b>SAR ${rows.reduce((a,r)=>a+(r.pnl||0),0).toFixed(0)}</b>`:'No data.';
+  }
+}
+
+// ═══════════════════════════════════════════════
+// USER MANAGEMENT
+// ═══════════════════════════════════════════════
+function toggleAdminFields(){
+  const isAdmin=v('u-role')==='admin';
+  g('u-perms').style.opacity=isAdmin?'.4':'1';
+  g('u-perms').style.pointerEvents=isAdmin?'none':'auto';
+  if(isAdmin){['up-finance','up-flightecon','up-competitors','up-tasks'].forEach(id=>g(id).checked=true)}
+}
+function saveUser(){
+  const uid=v('u-id').trim().toLowerCase();
+  const pass=v('u-pass').trim();
+  const name=v('u-name').trim();
+  if(!uid){toast('User ID is required','err');return;}
+  if(!pass||pass.length<6){toast('Password must be at least 6 characters','err');return;}
+  const role=v('u-role');
+  const perms=role==='admin'
+    ?{finance:true,flightecon:true,competitors:true,tasks:true}
+    :{finance:g('up-finance').checked,flightecon:g('up-flightecon').checked,
+      competitors:g('up-competitors').checked,tasks:g('up-tasks').checked};
+  // Store a simple hash of the password (not cryptographic — for lightweight auth only)
+  const pwHash=simpleHash(pass);
+  const userData={uid,name,role,perms,pwHash,active:true,createdBy:currentUser,createdAt:nowISO()};
+  db.ref('users/'+uid).set(userData)
+    .then(()=>{toast('✅ User '+uid+' saved');clrUser();})
+    .catch(e=>toast('❌ '+e.message,'err'));
+}
+function clrUser(){['u-id','u-name','u-pass'].forEach(id=>g(id)&&(g(id).value=''));g('u-role').value='user';toggleAdminFields()}
+function delUser(uid){
+  if(uid===ADMIN_ID){toast('Cannot remove the main admin','err');return}
+  if(!confirm('Deactivate user '+uid+'? They will no longer be able to log in.'))return;
+  db.ref('users/'+uid).update({active:false}).then(()=>toast('✅ User deactivated'));
+}
+function renderUserList(){
+  const el=g('user-list');if(!el)return;
+  const users=Object.values(usersMap);
+  if(!users.length){el.innerHTML='<div class="empty-state">No users yet. Add the initial users above.</div>';return}
+  const pMap={finance:'Finance',flightecon:'Flight Econ',competitors:'Competitors',tasks:'Tasks'};
+  const badgeC={finance:'b-blue',flightecon:'b-teal',competitors:'b-gold',tasks:'b-green'};
+  el.innerHTML=users.map(u=>`<div class="user-card">
+    <div class="user-avatar ${u.role==='admin'?'ua-admin':'ua-user'}">${(u.uid||'?').substring(0,3).toUpperCase()}</div>
+    <div class="user-info">
+      <h4>${u.uid}</h4>
+      <p>${u.name||'—'} · <span class="badge ${u.role==='admin'?'b-gold':'b-blue'}">${u.role}</span> · <span class="badge ${u.active?'b-green':'b-red'}">${u.active?'Active':'Inactive'}</span></p>
+      <div class="user-access">
+        ${u.role==='admin'?'<span class="badge b-gold">Full Access</span>':
+          Object.entries(u.perms||{}).filter(([,pv])=>pv).map(([k])=>'<span class="badge '+(badgeC[k]||'b-gray')+'">'+(pMap[k]||k)+'</span>').join('')}
+      </div>
+    </div>
+    ${u.uid!==ADMIN_ID?`<button class="btn btn-danger btn-sm" onclick="delUser('${u.uid}')">${u.active?'Deactivate':'Deactivated'}</button>`:'<span class="badge b-gold">Main Admin</span>'}
+  </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════
+// EXCEL EXPORT
+// ═══════════════════════════════════════════════
+function exportExcel(section){
+  const wb=XLSX.utils.book_new();
+  if(section==='finance'||section==='all'){
+    const rows=allData.finance.map(r=>({
+      Period:r.period,By:r.by,
+      'BSP Sale':r.bsp,'Counter Sale':r.counter,'VA Sales':r.va,'HR Cargo':r.cargo,
+      'DIP Mail':r.dip,'EBT Sale':r.ebt,'Misc Sale':r.miscSale,
+      'Total Sales':r.totalSales,
+      'RAC':r.rac,'GACA':r.gaca,'Swissport':r.swiss,'Fuel':r.fuel,
+      'Salaries':r.sal,'Utilities':r.util,'Misc Exp':r.miscExp,
+      'Total Expenses':r.totalExp,'Net P&L':r.pnl,
+      Remarks:r.remarks,'Entry Date':r.createdAt
+    }));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Finance');
+  }
+  if(section==='flightecon'||section==='all'){
+    const rows=allData.flightecon.map(r=>({
+      Date:r.date,By:r.by,Direction:r.dir==='OB'?'Outbound':'Inbound',
+      Sector:r.dir==='OB'?'RUH→'+r.sector:r.sector+'→RUH',
+      Aircraft:r.ac,'Avg Fare':r.fare,VOC:r.voc,DOC:r.doc,NOC:r.noc,
+      Remarks:r.remarks,'Entry Date':r.createdAt
+    }));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Flight Economics');
+  }
+  if(section==='competitors'||section==='all'){
+    const rows=allData.competitors.map(r=>({
+      Date:r.date,By:r.by,Direction:r.dir==='OB'?'Outbound':'Inbound',
+      Sector:r.dir==='OB'?'RUH→'+r.sector:r.sector+'→RUH',
+      PIA:r.pia,'Saudi Airlines':r.sv,Flynas:r.xq,Flyadeal:r.f3,Airblue:r.pa,AirSial:r.airsial,'Fly Jinnah':r.p9,
+      'Load PIA':r.lpia,'Load Saudia':r.lsv,'Load Flynas':r.lxq,'Load Flyadeal':r.lf3,
+      'Load Airblue':r.lpa,'Load AirSial':r.lai,'Load Fly Jinnah':r.l9p,
+      'Entry Date':r.createdAt
+    }));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Competitor Fares');
+  }
+  if(section==='tasks'||section==='all'){
+    const rows=allData.tasks.map(r=>({
+      Title:r.title,'Assigned To':r.assign,Priority:r.priority,'Due Date':r.due,
+      Category:r.category,Status:r.status,Notes:r.notes,
+      'Created By':r.by,'Entry Date':r.createdAt
+    }));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Tasks');
+  }
+  const fname='RUH_Station_'+(section==='all'?'MasterRecord':''+section)+'_'+new Date().toISOString().split('T')[0]+'.xlsx';
+  XLSX.writeFile(wb,fname);
+  toast('✅ Excel file downloaded');
+}
+function exportAllExcel(){exportExcel('all')}
+
+// ═══════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════
+function fmtN(v){if(v===undefined||v===null||v==='')return'—';return parseFloat(v).toFixed(2)}
+function sgn(v){return(v>=0?'+':'')+parseFloat(v).toFixed(2)}
+function avg(arr){return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0}
+function canDelete(r){return currentRole==='admin'||(r.by===currentUser)}
+function delRec(table,key){
+  if(!confirm('Delete this record?'))return;
+  db.ref(table+'/'+key).remove().then(()=>toast('✅ Record deleted')).catch(e=>toast('❌ '+e.message,'err'));
+}
+
+// ═══════════════════════════════════════════════
+// SECTOR DROPDOWNS INIT
+// ═══════════════════════════════════════════════
+function initSectors(){
+  updFeSectors();updCfSectors();
+  const t=today();
+  ['fe-date','cf-date','t-due'].forEach(id=>{if(g(id))g(id).value=t});
+  const mo=t.substring(0,7);
+  if(g('fin-period'))g('fin-period').value=mo;
+}
+
+// ═══════════════════════════════════════════════
+// FIRST-TIME ADMIN SETUP
+// ═══════════════════════════════════════════════
+function ensureAdminUser(){
+  db.ref('users/'+ADMIN_ID).once('value').then(function(snap){
+    if(!snap.val()){
+      var pass=prompt('FIRST TIME SETUP\nSet a password for admin account ('+ADMIN_ID+'):\nMinimum 6 characters:');
+      if(!pass||pass.length<6){alert('Password must be at least 6 characters. Please refresh and try again.');hide('loading');show('auth-screen');return;}
+      var pwHash=simpleHash(pass);
+      db.ref('users/'+ADMIN_ID).set({
+        uid:ADMIN_ID,name:'Station Manager',role:'admin',pwHash:pwHash,
+        perms:{finance:true,flightecon:true,competitors:true,tasks:true},
+        active:true,createdAt:nowISO()
+      }).then(function(){
+        alert('Admin account created!\nLogin ID: '+ADMIN_ID+'\nUse the password you just set.');
+        hide('loading');show('auth-screen');
+      }).catch(function(e){alert('Error: '+e.message);hide('loading');show('auth-screen');});
+    } else {
+      hide('loading');show('auth-screen');
+    }
+  }).catch(function(e){
+    console.error('Firebase error:',e);
+    hide('loading');
+    // Show error in auth screen
+    document.getElementById('setup-screen').style.display='flex';
+    alert('Could not connect to Firebase. Check your configuration.\nError: '+e.message);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════
+window.onload=function(){
+  if(!initFirebase())return;
+  initSectors();
+  db.ref('.info/connected').on('value',snap=>{
+    const connected=snap.val()===true;
+    if(g('sync-dot')){g('sync-dot').className='sync-dot'+(connected?'':' offline');g('sync-label').textContent=connected?'Live sync':'Offline'}
+  });
+  ensureAdminUser();
+};
+</script>
+</body>
+</html>
